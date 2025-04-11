@@ -8,8 +8,9 @@ use crate::hashes::Hash;
 use crate::model::{Recipient, WalletTxOut};
 use crate::registry::Contract;
 use crate::wollet::Wollet;
-use crate::ElementsNetwork;
+use crate::{ElementsNetwork, EC};
 use elements::pset::elip100::AssetMetadata;
+use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -197,6 +198,28 @@ impl Wollet {
         let address = self.address(Some(*last_unused))?;
         *last_unused += 1;
         Ok(Recipient::from_address(satoshi, address.address(), asset))
+    }
+
+    pub(crate) fn calculate_vsize(
+        &self,
+        pset: &PartiallySignedTransaction,
+        ct_discount: bool,
+        inp_txout_sec: &HashMap<usize, TxOutSecrets>,
+        inp_weight: usize,
+    ) -> Result<usize, Error> {
+        let mut rng = thread_rng();
+        let mut temp_pset = pset.clone();
+        temp_pset.blind_last(&mut rng, &EC, &inp_txout_sec)?;
+        let tx_weight = {
+            let tx = temp_pset.extract_tx()?;
+            if ct_discount {
+                tx.discount_weight()
+            } else {
+                tx.weight()
+            }
+        };
+        let weight = inp_weight + tx_weight;
+        Ok((weight + 4 - 1) / 4)
     }
 }
 

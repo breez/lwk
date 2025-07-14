@@ -11,8 +11,8 @@ documentation = "https://docs.rs/lwk_wollet"
 crate-type = ["lib"]
 
 [dependencies]
-lwk_common = { version = "0.10.0" }
-lwk_signer = { version = "0.10.0", features = [
+lwk_common = { path = "../lwk_common" }
+lwk_signer = { path = "../lwk_signer", features = [
     "jade",
     "ledger",
 ], optional = true }
@@ -42,9 +42,7 @@ reqwest = { version = "0.12", optional = true, default-features = false, feature
     "json",
     "rustls-tls",
 ] }
-tokio_with_wasm = { version = "=0.8.2", features = [
-    "time",
-] }
+tokio_with_wasm = { version = "=0.8.2", features = ["time"] }
 
 
 #registry
@@ -82,7 +80,7 @@ js-sys = { version = "0.3.68" }
 [dev-dependencies]
 lwk_jade = { version = "0.10.0", features = ["test_emulator"] }
 lwk_ledger = { version = "0.10.0", features = ["test_emulator"] }
-lwk_signer = { version = "0.10.0", features = ["jade", "ledger"] }
+lwk_signer = { path = "../lwk_signer", features = ["jade", "ledger"] }
 lwk_containers = { version = "0.10.0" }
 lwk_test_util = { version = "0.10.0" }
 

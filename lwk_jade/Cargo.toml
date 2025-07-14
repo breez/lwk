@@ -8,8 +8,8 @@ license = "MIT OR BSD-2-Clause"
 documentation = "https://docs.rs/lwk_jade"
 
 [dependencies]
-lwk_common = { version = "0.10.0" }
 lwk_containers = { version = "0.10.0", optional = true }
+lwk_common = { path = "../lwk_common" }
 
 tempfile = { version = "3.8.0", optional = true }
 

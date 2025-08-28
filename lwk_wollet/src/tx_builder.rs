@@ -17,6 +17,8 @@ use crate::{
     Contract, ElementsNetwork, Error, LiquidexProposal, UnvalidatedRecipient, Wollet, EC,
 };
 
+const SECP256K1_SURJECTIONPROOF_MAX_N_INPUTS: usize = 256;
+
 pub fn extract_issuances(tx: &Transaction) -> Vec<IssuanceDetails> {
     let mut r = vec![];
     for (vin, txin) in tx.input.iter().enumerate() {
@@ -577,6 +579,7 @@ impl TxBuilder {
             for utxo in utxos
                 .values()
                 .filter(|u| u.unblinded.asset == maker_output_asset)
+                .take(SECP256K1_SURJECTIONPROOF_MAX_N_INPUTS)
             {
                 wollet.add_input(&mut pset, &mut inp_txout_sec, &mut inp_weight, utxo)?;
                 let surj_input = elements::SurjectionInput::from_txout_secrets(utxo.unblinded);
@@ -620,6 +623,7 @@ impl TxBuilder {
         for utxo in utxos
             .values()
             .filter(|u| u.unblinded.asset == wollet.policy_asset())
+            .take(SECP256K1_SURJECTIONPROOF_MAX_N_INPUTS)
         {
             wollet.add_input(&mut pset, &mut inp_txout_sec, &mut inp_weight, utxo)?;
             let surj_input = elements::SurjectionInput::from_txout_secrets(utxo.unblinded);
@@ -786,7 +790,11 @@ impl TxBuilder {
             } else {
                 // Add more asset utxos until we cover the amount to send
                 if satoshi_in < satoshi_out {
-                    for utxo in utxos.values().filter(|u| u.unblinded.asset == asset) {
+                    for utxo in utxos
+                        .values()
+                        .filter(|u| u.unblinded.asset == asset)
+                        .take(SECP256K1_SURJECTIONPROOF_MAX_N_INPUTS)
+                    {
                         wollet.add_input(&mut pset, &mut inp_txout_sec, &mut inp_weight, utxo)?;
                         satoshi_in += utxo.unblinded.value;
                         if satoshi_in >= satoshi_out {
@@ -842,7 +850,11 @@ impl TxBuilder {
             }
         } else {
             // FIXME: For implementation simplicity now we always add all L-BTC inputs
-            for utxo in utxos.values().filter(|u| u.unblinded.asset == policy_asset) {
+            for utxo in utxos
+                .values()
+                .filter(|u| u.unblinded.asset == policy_asset)
+                .take(SECP256K1_SURJECTIONPROOF_MAX_N_INPUTS)
+            {
                 wollet.add_input(&mut pset, &mut inp_txout_sec, &mut inp_weight, utxo)?;
                 satoshi_in += utxo.unblinded.value;
             }

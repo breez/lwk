@@ -2,25 +2,14 @@
 use crate::Error;
 
 /// Sleep asynchronously for the given number of milliseconds on WASM targets.
+///
+/// Uses `tokio_with_wasm` rather than `web_sys`'s `window().setTimeout` so that
+/// it also works in non-browser WASM environments (e.g. Node.js), which have no
+/// `window` object.
 #[cfg(target_arch = "wasm32")]
 pub async fn async_sleep(millis: u64) -> Result<(), Error> {
-    let mut cb = |resolve: js_sys::Function, reject: js_sys::Function| {
-        let result = web_sys::window()
-            .ok_or(Error::AsyncSleepMissingWindow)
-            .and_then(|window| {
-                window
-                    .set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, millis as i32)
-                    .map_err(|err| Error::AsyncSleepFailed(format!("{err:?}")))
-            });
-
-        if let Err(err) = result {
-            let _ = reject.call1(&js_sys::Object::new().into(), &err.to_string().into());
-        }
-    };
-    let p = js_sys::Promise::new(&mut cb);
-    wasm_bindgen_futures::JsFuture::from(p)
-        .await
-        .map_err(|err| Error::AsyncSleepFailed(format!("{err:?}")))?;
+    use tokio_with_wasm::alias as tokio;
+    tokio::time::sleep(std::time::Duration::from_millis(millis)).await;
     Ok(())
 }
 

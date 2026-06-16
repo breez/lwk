@@ -69,24 +69,26 @@ impl UpdatesPersister {
     }
 
     fn get_update(&self, index: usize) -> Result<Option<Update>, Error> {
-        Ok(self
-            .updates_store
+        self.updates_store
             .get(&update_key(index))
-            .map_err(|e| Error::Generic(format!("store error: {e}")))?
-            .map(|u| Update::deserialize(&u))
-            .transpose()?)
+            .map_err(Error::StoreError)?
+            // A persisted update that fails to decode is a corrupt cache entry, surface it as a
+            // store error so callers can recover (e.g. by wiping the cache) rather than treating
+            // it like an encoding bug elsewhere.
+            .map(|u| Update::deserialize(&u).map_err(|e| Error::StoreError(Box::new(e))))
+            .transpose()
     }
 
     fn set_update(&self, index: usize, update: &Update) -> Result<(), Error> {
         self.updates_store
             .put(&update_key(index), &update.serialize()?)
-            .map_err(|e| Error::Generic(format!("store error: {e}")))
+            .map_err(Error::StoreError)
     }
 
     fn remove_update(&self, index: usize) -> Result<(), Error> {
         self.updates_store
             .remove(&update_key(index))
-            .map_err(|e| Error::Generic(format!("store error: {e}")))
+            .map_err(Error::StoreError)
     }
 
     fn merge_updates(&self, next_index: usize) -> Result<usize, Error> {

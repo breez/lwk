@@ -1200,20 +1200,49 @@ impl TxBuilder {
             inp_weight + tx_weight
         };
 
-        let fee = calculate_fee(weight, self.fee_rate);
-        if satoshi_in <= (satoshi_out + fee) {
-            return Err(Error::InsufficientFunds {
-                missing_sats: (satoshi_out + fee + 1) - satoshi_in, // +1 to ensure we have more than just equal
-                asset_id: wollet.policy_asset(),
-                is_token: false,
-            });
-        }
-        let satoshi_change = satoshi_in - satoshi_out - fee;
+        let mut fee = calculate_fee(weight, self.fee_rate);
+        let mut n_outputs = pset.n_outputs();
+
         // Replace change and fee outputs
-        let n_outputs = pset.n_outputs();
-        let outputs = pset.outputs_mut();
-        let change_output = &mut outputs[n_outputs - 2]; // index check: we always have the lbtc change and the fee output at least
-        change_output.amount = Some(satoshi_change);
+        let outputs = if satoshi_in <= (satoshi_out + fee) {
+            // The inputs don't leave room for a change output. Remove the change
+            // output and check whether we can build a transaction with no change,
+            // i.e. one where the inputs exactly cover the outputs plus the fee.
+            pset.remove_output(n_outputs - 2);
+
+            let weight = {
+                let mut rng = thread_rng();
+                let mut temp_pset = pset.clone();
+                temp_pset.blind_last(&mut rng, &EC, &inp_txout_sec)?;
+                let tx_weight = {
+                    let tx = temp_pset.extract_tx()?;
+                    if self.ct_discount {
+                        tx.discount_weight()
+                    } else {
+                        tx.weight()
+                    }
+                };
+                inp_weight + tx_weight
+            };
+            let new_fee = calculate_fee(weight, self.fee_rate);
+            if satoshi_in != (satoshi_out + new_fee) {
+                return Err(Error::InsufficientFunds {
+                    missing_sats: (satoshi_out + fee + 1) - satoshi_in, // +1 to ensure we have more than just equal
+                    asset_id: wollet.policy_asset(),
+                    is_token: false,
+                });
+            }
+            fee = new_fee;
+            n_outputs = pset.n_outputs();
+            pset.outputs_mut()
+        } else {
+            let satoshi_change = satoshi_in - satoshi_out - fee;
+            let outputs = pset.outputs_mut();
+            let change_output = &mut outputs[n_outputs - 2]; // index check: we always have the lbtc change and the fee output at least
+            change_output.amount = Some(satoshi_change);
+            outputs
+        };
+        // Replace fee output
         let fee_output = &mut outputs[n_outputs - 1];
         fee_output.amount = Some(fee);
 
